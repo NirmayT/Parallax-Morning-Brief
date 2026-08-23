@@ -33,18 +33,18 @@ active subscribers
 Gmail newsletters + market data       |
               |                       |
               v                       |
-        extract / rank                 |
+        extract / rank                |
               |                       |
               v                       |
-       synthesize / edit               |
+       synthesize / edit              |
               |                       |
               v                       |
-      deterministic gate               |
+      deterministic gate              |
               |                       |
               v                       |
-        exact HTML edition              |
+        exact HTML edition            |
               |                       |
-              +------------------------+
+              +-----------------------+
               |
               v
         Resend delivery
