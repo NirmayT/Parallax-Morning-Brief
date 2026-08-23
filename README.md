@@ -1,10 +1,16 @@
 # Parallax Morning Brief
 
+### Part of Parallax Research Group
+
+Parallax Morning Brief is a project by **Parallax Research Group**, focused on independent, data-driven research across markets and technology.
+
+**The view depends on where you stand.** [Read and subscribe](https://parallax-research-plum.vercel.app/).
+
 > **Every market has multiple angles.**
 
 Parallax Morning Brief is a human-reviewed Python market-intelligence pipeline that turns selected market newsletters and cross-asset market data into a concise, Substack-ready morning brief.
 
-The system deliberately separates **selection from writing**. Python and bounded AI tasks extract, cluster, score, and select market developments first. A full-edition writer then receives only the ranked editorial package and observed market data, followed by a holistic editor and deterministic quality gate.
+The system deliberately separates **selection from writing**. Python and bounded AI tasks extract, cluster, score, and select market developments first. A full-edition writer then receives the ranked editorial package, supporting evidence, and observed market data, followed by a holistic editor and deterministic quality gate.
 
 Parallax is a **personal research and portfolio project**. It is not a trading system, investment adviser, institutional market-data product, or automatic fact-checker.
 
@@ -300,18 +306,30 @@ The pipeline is designed to tolerate irrelevant labeled mail, but your source se
 
 ## Delivery configuration
 
-Set your sender and private Substack publish-by-email address in your local `src/config.py` configuration.
+Parallax reads the sender and recipient addresses from environment variables:
 
-For example:
-
-```python
-SENDER_EMAIL = "your-gmail@gmail.com"
-RECIPIENT_EMAIL = "your-private-substack-address"
+```text
+SENDER_EMAIL
+RECIPIENT_EMAIL
 ```
 
-Treat the Substack publish-by-email address as a secret.
+For the current PowerShell session:
 
-For a public repository, replace personal values with placeholders before committing.
+```powershell
+$env:SENDER_EMAIL="your-gmail@gmail.com"
+$env:RECIPIENT_EMAIL="your-private-substack-publish-address"
+```
+
+To store them for your Windows user account:
+
+```powershell
+setx SENDER_EMAIL "your-gmail@gmail.com"
+setx RECIPIENT_EMAIL "your-private-substack-publish-address"
+```
+
+Open a new terminal after using `setx`.
+
+`RECIPIENT_EMAIL` should be the private address used by your Substack delivery workflow. Do not commit real delivery addresses or credentials to the repository.
 
 ---
 
@@ -581,16 +599,6 @@ Open Question quality
 ```
 
 Change ranking or clustering logic only after a repeated real-world failure appears.
-
----
-
-# Portfolio framing
-
-A concise description:
-
-> Built an end-to-end Python market-intelligence pipeline integrating Gmail ingestion, cross-asset market data, structured story extraction, deterministic clustering, transparent editorial ranking, cohesive AI synthesis, quality gates, and human-reviewed Substack delivery.
-
-The repository demonstrates the engineering system. The publication demonstrates the editorial output.
 
 ---
 
