@@ -584,16 +584,6 @@ Change ranking or clustering logic only after a repeated real-world failure appe
 
 ---
 
-# Portfolio framing
-
-A concise description:
-
-> Built an end-to-end Python market-intelligence pipeline integrating Gmail ingestion, cross-asset market data, structured story extraction, deterministic clustering, transparent editorial ranking, cohesive AI synthesis, quality gates, and human-reviewed Substack delivery.
-
-The repository demonstrates the engineering system. The publication demonstrates the editorial output.
-
----
-
 # Disclaimer
 
 Personal project. Not affiliated with or endorsed by any employer.
