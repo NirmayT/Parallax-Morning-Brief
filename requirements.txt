@@ -1,0 +1,15 @@
+# HTML / email parsing
+beautifulsoup4>=4.12,<5
+lxml>=5.0,<7
+
+# AI client (Gemini through OpenAI-compatible API)
+openai>=1.0,<2
+
+# Market data
+yfinance>=0.2.40,<2
+
+# Gmail / Google OAuth
+google-api-python-client>=2.0,<3
+google-auth>=2.0,<3
+google-auth-oauthlib>=1.0,<2
+google-auth-httplib2>=0.2,<1

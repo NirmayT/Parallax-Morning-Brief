@@ -1,0 +1,89 @@
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# ------------------------------
+# Virtual environments
+# ------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ------------------------------
+# Secrets / authentication
+# ------------------------------
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+client_secret*.json
+*.pem
+*.key
+
+# ------------------------------
+# Parallax runtime state
+# ------------------------------
+state/
+outputs/
+debug/
+logs/
+*.log
+
+# ------------------------------
+# Private source / generated data
+# ------------------------------
+raw_emails/
+ranked_packages/
+newsletter_cache/
+source_cache/
+*.mbox
+*.eml
+
+# ------------------------------
+# Local project-only assets
+# ------------------------------
+parallax-logo-all-versions/
+private/
+local/
+
+# ------------------------------
+# Build / packaging
+# ------------------------------
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ------------------------------
+# IDE / editor
+# ------------------------------
+.vscode/
+.idea/
+*.code-workspace
+
+# ------------------------------
+# OS files
+# ------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ------------------------------
+# Temporary files
+# ------------------------------
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
