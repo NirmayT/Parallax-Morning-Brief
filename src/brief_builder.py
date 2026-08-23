@@ -61,7 +61,7 @@ def build_html(reference, market, ai, status):
         h.append(f'<p style="font-size:16px;line-height:1.6;margin:18px 0 6px;">{bs._h(ai["mood"])}</p>')
     if ai.get("key_line"):
         h.append(f'<p style="font-size:18px;line-height:1.45;font-weight:700;color:{NAVY};margin:16px 0;">{bs._h(ai["key_line"])}</p>')
-    h += [bs.html_summary(ai.get("market_summary", {})), _snapshot(market), bs.html_parallax(ai.get("parallax", {})), bs.html_headlines(ai.get("top_headlines", [])), bs.html_moving(ai.get("whats_moving", {})), bs.html_question(ai.get("open_question", {})), f'<div style="border-top:1px solid #e5e7eb;margin-top:26px;padding-top:12px;font-size:12px;color:#9ca3af;">{bs._h(config.PROJECT_DISCLAIMER)}<br>Prices via Yahoo Finance for this personal prototype and may lag. This is one morning read, not investment advice.</div></div>']
+    h += [bs.html_summary(ai.get("market_summary", {})), _snapshot(market), bs.html_parallax(ai.get("parallax", {})), bs.html_headlines(ai.get("top_headlines", [])), bs.html_moving(ai.get("whats_moving", {})), bs.html_question(ai.get("open_question", {})), f'<div style="border-top:1px solid #e5e7eb;margin-top:26px;padding-top:12px;font-size:12px;color:#9ca3af;">{bs._h(config.PROJECT_DISCLAIMER)}<br>Prices via Yahoo Finance for this personal prototype and may lag. This is one morning read, not investment advice.<br><span data-parallax-unsubscribe></span></div></div>']
     return "\n".join(h)
 
 

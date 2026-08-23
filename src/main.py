@@ -13,6 +13,8 @@ import story_ranker
 import synthesis
 import brief_builder
 import email_sender
+import subscriber_store
+import broadcast_sender
 
 
 def _recent_titles(reference_dt):
@@ -81,24 +83,46 @@ def run(dry_run=False, force=False):
         plain = "INTERNAL REVIEW WARNING: QUALITY GATE FAILED.\n\n" + plain
     subject = ai.get("daily_title", config.EMAIL_SUBJECT_PREFIX).strip()
 
+    # Always retain the exact generated artifact locally.
+    email_sender.save_local(subject, plain, html)
+
     if dry_run:
-        email_sender.deliver(subject, plain, html, dry_run=True)
         utils.log(f"[PIPELINE] Dry run: state not updated. Publish ready: {publish_ready}.")
         sent = False
     elif not publish_ready:
-        email_sender.save_local(subject, plain, html)
         utils.log("[PIPELINE] LIVE DELIVERY BLOCKED: quality gate failed. State not updated.")
         sent = False
     else:
-        sent = email_sender.deliver(subject, plain, html, dry_run=False)
+        try:
+            subscribers = subscriber_store.get_active_subscribers()
+            utils.log(f"[BROADCAST] Active subscribers: {len(subscribers)}.")
+            delivery = broadcast_sender.deliver(subject, plain, html, subscribers)
+        except Exception as exc:
+            utils.log(f"[BROADCAST] Delivery setup/send failed: {exc}")
+            delivery = {"attempted": 0, "accepted": 0, "failed": 0, "failures": []}
+
+        sent = delivery.get("accepted", 0) > 0
+
         if sent:
+            # The edition was distributed to at least one active subscriber.
+            # Do not regenerate/re-send the same edition just because one address
+            # failed; partial failures are a delivery concern, not editorial state.
             ids = [source["id"] for source in newsletters.get("sources", []) if source.get("id")]
             utils.append_processed_ids(ids)
             story_memory.remember(ai.get("top_headlines", []), reference_dt)
             utils.write_last_run(reference_dt)
-            utils.log("[PIPELINE] Delivery succeeded; state updated.")
+            utils.log(
+                "[PIPELINE] Broadcast accepted for "
+                f"{delivery.get('accepted', 0)}/{delivery.get('attempted', 0)} "
+                "subscriber(s); state updated."
+            )
+            if delivery.get("failed", 0):
+                utils.log(
+                    f"[PIPELINE] WARNING: {delivery['failed']} recipient(s) failed; "
+                    "review Resend logs before the next edition."
+                )
         else:
-            utils.log("[PIPELINE] Delivery failed; state NOT updated.")
+            utils.log("[PIPELINE] No subscriber delivery was accepted; state NOT updated.")
     utils.log("=" * 70)
     return sent
 
