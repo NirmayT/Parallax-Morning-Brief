@@ -147,6 +147,7 @@ Parallax currently ingests selected market and economic newsletters delivered to
 
 Current editorial inputs include:
 
+- **Reuters Morning Bid** — a weekday U.S. and global markets briefing covering macro, equities, rates, FX, commodities, geopolitics, and the day's major events to watch. <https://www.reuters.com/>
 - **Axios Markets** — market trends and economic analysis from Axios. <https://pages.axios.com/axios-newsletters-2-0>
 - **Yahoo Finance Morning Brief** — Yahoo Finance's weekday markets newsletter. <https://finance.yahoo.com/topic/morning-brief/>
 - **Apollo — The Daily Spark** — data-driven macro and capital-markets analysis from Apollo Chief Economist Torsten Slok. <https://www.apollo.com/wealth/insights-news/insights/daily-spark>
@@ -154,6 +155,8 @@ Current editorial inputs include:
 These publications and their underlying content remain the property of their respective publishers and authors. Parallax does **not** redistribute complete newsletters, paid articles, charts, images, or long source excerpts. Source material is used internally for extraction, clustering, ranking, grounding, and attribution; the reader-facing brief provides concise original synthesis and identifies contributing publications.
 
 Inclusion does not imply affiliation with, sponsorship of, or endorsement of Parallax.
+
+To add a newsletter operationally, subscribe the Parallax Gmail account and apply the existing `PRG-Market-Newsletters` label. The pipeline does not require a sender whitelist. Known-source metadata is used only for editorial classification/protection; Reuters Morning Bid is treated as a general cross-asset source.
 
 ### Market data
 

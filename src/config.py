@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 TIMEZONE = ZoneInfo("America/Toronto")
 GMAIL_LABEL = "PRG-Market-Newsletters"
-DEFAULT_FIRST_RUN_LOOKBACK_HOURS = 48
+DEFAULT_FIRST_RUN_LOOKBACK_HOURS = 24
 MAX_LOOKBACK_HOURS = 72
 MIN_HOURS_BETWEEN_RUNS = 1
 MAX_PARAGRAPHS_PER_SOURCE = 10
@@ -75,7 +75,10 @@ THEME_ORDER = [
 SOURCE_PROFILES = {
     "Axios Markets": {"type": "general", "quality_weight": 1.0},
     "Yahoo Finance Morning Brief": {"type": "general", "quality_weight": 1.0},
+    # Reuters Morning Bid is broad cross-asset / macro coverage, so it belongs
+    # in the general bucket rather than specialist protection.
     "Reuters Morning Bid": {"type": "general", "quality_weight": 1.0},
+    "Reuters": {"type": "general", "quality_weight": 1.0},
     "Off the Charts": {"type": "specialist", "quality_weight": 1.05},
     "Apollo": {"type": "specialist", "quality_weight": 1.05},  # publishes as "The Daily Spark" -- same source, one entry
     "Orange Juice Newsletter": {"type": "specialist", "quality_weight": 1.05},  # FXStreet, FX-focused
