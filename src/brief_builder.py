@@ -4,8 +4,7 @@ import utils
 import brief_sections as bs
 
 NAVY, MUTE, GREEN, RED = "#1f4e79", "#6b7280", "#137333", "#c5221f"
-WRAP = "font-family:Georgia,'Times New Roman',serif;max-width:600px;margin:0 auto;padding:20px 18px;color:#1a1a1a;line-height:1.55;"
-
+WRAP = "font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;padding:20px 18px;color:#1a1a1a;line-height:1.55;"
 
 def _color(value, neutral=False):
     if neutral or value in (None, 0):
