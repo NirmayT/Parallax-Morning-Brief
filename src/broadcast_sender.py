@@ -27,6 +27,14 @@ def _require_config():
     if not config.PUBLIC_SITE_URL:
         raise RuntimeError("PUBLIC_SITE_URL is not configured")
 
+    # Fail closed on bulk-mail identification requirements.
+    if not config.PUBLISHER_NAME:
+        raise RuntimeError("PUBLISHER_NAME is not configured")
+    if not config.COMPLIANCE_CONTACT_EMAIL:
+        raise RuntimeError("COMPLIANCE_CONTACT_EMAIL is not configured")
+    if not config.SUBSCRIPTION_DISCLOSURE:
+        raise RuntimeError("SUBSCRIPTION_DISCLOSURE is not configured")
+
 
 def unsubscribe_url(token: str) -> str:
     token = str(token or "").strip()
@@ -57,11 +65,7 @@ def _response_id(response) -> str:
 
 
 def deliver(subject: str, plain: str, html: str, subscribers: list[dict]) -> dict:
-    """Send one private, personalized copy to each active subscriber.
-
-    We intentionally send individual messages rather than exposing the list with
-    To/CC/BCC, because each subscriber receives a unique unsubscribe URL.
-    """
+    """Send one private, personalized copy to each active subscriber."""
     _require_config()
 
     count = len(subscribers)
@@ -98,6 +102,7 @@ def deliver(subject: str, plain: str, html: str, subscribers: list[dict]) -> dic
                     "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
                 },
             }
+
             if config.RESEND_REPLY_TO:
                 params["reply_to"] = config.RESEND_REPLY_TO
 
@@ -107,12 +112,14 @@ def deliver(subject: str, plain: str, html: str, subscribers: list[dict]) -> dic
                 f"[BROADCAST] Accepted recipient {accepted}/{count}; "
                 f"provider_id={_response_id(response) or 'n/a'}"
             )
+
         except Exception as exc:
-            # Never write subscriber addresses to logs/debug output.
-            failures.append({
-                "subscriber_id": str(subscriber.get("id") or ""),
-                "error": str(exc),
-            })
+            failures.append(
+                {
+                    "subscriber_id": str(subscriber.get("id") or ""),
+                    "error": str(exc),
+                }
+            )
             utils.log(
                 f"[BROADCAST] Recipient failed "
                 f"({len(failures)} failure(s) so far): {exc}"

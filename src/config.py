@@ -31,6 +31,7 @@ RATE_TICKERS = {
     "US 10Y": "^TNX",
     "US 30Y": "^TYX",
 }
+
 OVERNIGHT_RATES = {"SOFR": None, "CORRA": None}
 
 MARKET_KEYWORDS = {
@@ -62,44 +63,39 @@ MARKET_KEYWORDS = {
         "sentiment", "safe haven", "flight to safety",
     ],
 }
+
 THEME_ORDER = [
     "Rates and Central Banks", "Macro and Economics", "Foreign Exchange",
     "Equities and Credit", "Commodities", "Volatility and Risk",
 ]
 
 # Known sources affect metadata and specialist protection, not factual truth.
-# NOTE: this dict is not currently read anywhere in the pipeline -- the live
-# classification that actually drives scoring is SPECIALIST_MARKERS in
-# story_ranker.py. Keep this in sync with that tuple manually until the two
-# are unified; it exists for human reference and any future wiring-in.
 SOURCE_PROFILES = {
     "Axios Markets": {"type": "general", "quality_weight": 1.0},
     "Yahoo Finance Morning Brief": {"type": "general", "quality_weight": 1.0},
-    # Reuters Morning Bid is broad cross-asset / macro coverage, so it belongs
-    # in the general bucket rather than specialist protection.
     "Reuters Morning Bid": {"type": "general", "quality_weight": 1.0},
     "Reuters": {"type": "general", "quality_weight": 1.0},
     "Off the Charts": {"type": "specialist", "quality_weight": 1.05},
-    "Apollo": {"type": "specialist", "quality_weight": 1.05},  # publishes as "The Daily Spark" -- same source, one entry
-    "Orange Juice Newsletter": {"type": "specialist", "quality_weight": 1.05},  # FXStreet, FX-focused
+    "Apollo": {"type": "specialist", "quality_weight": 1.05},
+    "Orange Juice Newsletter": {"type": "specialist", "quality_weight": 1.05},
 }
 
 TARGET_SELECTED_STORIES = 3
 MAX_SELECTED_STORIES = 3
-MIN_SELECTED_STORIES = 2 
+MIN_SELECTED_STORIES = 2
 MAX_STORIES_PER_THEME = 2
 MIN_CONSENSUS_SOURCES = 2
 ALLOW_SPECIALIST_EXCEPTION = True
 
 # Delivery/runtime configuration. Real values live only in environment variables.
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "").strip()  # optional reply-to address
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "").strip()
 EMAIL_SUBJECT_PREFIX = "Parallax"
 
 # Subscriber database (server-side only).
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_SECRET_KEY = (
     os.getenv("SUPABASE_SECRET_KEY", "").strip()
-    or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()  # legacy fallback
+    or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
 )
 
 # Exact-HTML broadcast delivery via Resend.
@@ -108,11 +104,29 @@ RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "").strip()
 RESEND_REPLY_TO = os.getenv("RESEND_REPLY_TO", SENDER_EMAIL).strip()
 PUBLIC_SITE_URL = os.getenv(
     "PUBLIC_SITE_URL",
-    "https://parallax-research-plum.vercel.app",
+    "https://parallaxresearchgroup.ca",
 ).rstrip("/")
 
-# Safety cap for one production broadcast. Keep this <= your provider/day limit.
+# Broadcast safety cap.
 BROADCAST_MAX_RECIPIENTS = int(os.getenv("BROADCAST_MAX_RECIPIENTS", "90"))
+
+# Newsletter identification / compliance metadata.
+# Note: a mailing address is intentionally not enforced in this temporary version.
+PUBLISHER_NAME = os.getenv(
+    "PUBLISHER_NAME",
+    "Parallax Research Group",
+).strip()
+
+COMPLIANCE_CONTACT_EMAIL = os.getenv(
+    "COMPLIANCE_CONTACT_EMAIL",
+    "newsletter@parallaxresearchgroup.ca",
+).strip()
+
+
+SUBSCRIPTION_DISCLOSURE = os.getenv(
+    "SUBSCRIPTION_DISCLOSURE",
+    "You are receiving this email because you subscribed to the Parallax Morning Brief at parallaxresearchgroup.ca.",
+).strip()
 
 STATE_DIR = "state"
 LAST_RUN_FILE = "state/last_run.txt"
@@ -136,12 +150,12 @@ AI_MODEL = "gemini-3.6-flash"
 AI_API_KEY_ENV = "GEMINI_API_KEY"
 AI_TEMPERATURE = 0.4
 AI_REASONING_EFFORT = "low"
-# Free-tier safety: deterministic clustering is strong enough for v1.0 and
-# skipping the optional SAME/DIFFERENT call leaves headroom for the final editor.
+
 ENABLE_AI_BORDERLINE_ADJUDICATION = False
 AI_MAX_TOKENS = 6500
 MAX_EXTRACTION_FALLBACK_SHARE = 0.25
 AI_MAX_HEADLINES = 4
 
-# Personal prototype disclosure.
-PROJECT_DISCLAIMER = "Personal project. Not affiliated with or endorsed by any employer."
+PROJECT_DISCLAIMER = (
+    "Independent project. Not affiliated with or endorsed by any employer."
+)
