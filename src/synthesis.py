@@ -28,6 +28,32 @@ CORE_LABELS = [
 ]
 
 
+def _daily_quota_exhausted(message):
+    text = str(message or "")
+    lower = text.lower()
+    return (
+        "GenerateRequestsPerDayPerProjectPerModel-FreeTier" in text
+        or "requests_per_day" in lower
+        or "requests per day" in lower
+        or "perdayperprojectpermodel" in lower
+    )
+
+
+def _wait_for_shared_ai_slot():
+    """Share one process-wide Gemini pacing clock with story_ranker."""
+    min_interval = getattr(config, "AI_MIN_CALL_INTERVAL_SECONDS", 13.0)
+    last_call = getattr(config, "_AI_LAST_CALL_TIME", 0.0)
+
+    if last_call:
+        elapsed = time.monotonic() - last_call
+        if elapsed < min_interval:
+            wait = min_interval - elapsed
+            utils.log(f"[AI] Rate-limit pacing: waiting {wait:.1f}s.")
+            time.sleep(wait)
+
+    config._AI_LAST_CALL_TIME = time.monotonic()
+
+
 def _clean(value):
     return re.sub(r"\s+", " ", str(value or "").replace("—", ", ").replace("–", ", ")).strip()
 
@@ -49,13 +75,28 @@ def _call(client, system, user, max_tokens=None):
         "temperature": getattr(config, "AI_TEMPERATURE", 0.1),
         "max_tokens": max_tokens or getattr(config, "AI_MAX_TOKENS", 6500),
     }
+
     reasoning_effort = getattr(config, "AI_REASONING_EFFORT", "low")
     if reasoning_effort:
         kwargs["reasoning_effort"] = reasoning_effort
+
+    if getattr(config, "_AI_DAILY_QUOTA_EXHAUSTED", False):
+        raise RuntimeError("Gemini daily free-tier request quota exhausted.")
+
+    _wait_for_shared_ai_slot()
+
     try:
         response = client.chat.completions.create(**kwargs)
+
     except Exception as exc:
         message = str(exc)
+
+        if _daily_quota_exhausted(message):
+            config._AI_DAILY_QUOTA_EXHAUSTED = True
+            raise RuntimeError(
+                "Gemini daily free-tier request quota exhausted."
+            ) from exc
+
         is_rpm_limit = (
             "GenerateRequestsPerMinute" in message
             or "requests_per_minute" in message.lower()
@@ -63,16 +104,37 @@ def _call(client, system, user, max_tokens=None):
         )
         if not is_rpm_limit:
             raise
-        match = re.search(r"retry(?:Delay| in)?[^0-9]*(\d+(?:\.\d+)?)s", message, re.I)
-        wait_seconds = min(30.0, max(1.0, float(match.group(1)) + 1.0 if match else 20.0))
-        utils.log(f"[AI] Per-minute quota reached; retrying once after {wait_seconds:.0f}s.")
+
+        match = re.search(
+            r"retry(?:Delay| in)?[^0-9]*(\d+(?:\.\d+)?)s",
+            message,
+            re.I,
+        )
+        wait_seconds = min(
+            65.0,
+            max(
+                getattr(config, "AI_MIN_CALL_INTERVAL_SECONDS", 13.0),
+                float(match.group(1)) + 1.0 if match else 20.0,
+            ),
+        )
+
+        utils.log(
+            "[AI] Per-minute quota reached; "
+            f"retrying once after {wait_seconds:.0f}s."
+        )
         time.sleep(wait_seconds)
+
+        if getattr(config, "_AI_DAILY_QUOTA_EXHAUSTED", False):
+            raise RuntimeError("Gemini daily free-tier request quota exhausted.")
+
+        config._AI_LAST_CALL_TIME = time.monotonic()
         response = client.chat.completions.create(**kwargs)
 
     choice = response.choices[0]
     content = (choice.message.content or "").strip()
     usage = getattr(response, "usage", None)
     finish_reason = getattr(choice, "finish_reason", None)
+
     utils.log(
         "[AI] "
         f"finish_reason={finish_reason} "
@@ -80,10 +142,13 @@ def _call(client, system, user, max_tokens=None):
         f"completion_tokens={getattr(usage, 'completion_tokens', None)} "
         f"chars={len(content)}"
     )
+
     if not content:
         raise RuntimeError("AI returned empty content")
     if str(finish_reason).lower() == "length":
-        raise RuntimeError("AI response truncated because output token limit was reached")
+        raise RuntimeError(
+            "AI response truncated because output token limit was reached"
+        )
     return content
 
 
@@ -316,12 +381,8 @@ def _validate(sections, package):
     if set(shown_cluster_ids) != approved_ids or len(shown_cluster_ids) != len(set(shown_cluster_ids)):
         errors.append("headline cluster IDs must use every selected cluster exactly once")
 
-    # Watch lines must match the Python-approved catalyst list exactly.
-    allowed_watch = {_clean(x) for x in package.get("watch_items", []) if _clean(x)}
-    for number in range(1, 5):
-        value = _clean(sections.get(f"WATCH {number}"))
-        if value and value.lower() != "none" and value not in allowed_watch:
-            errors.append(f"WATCH {number} is not an approved catalyst")
+    # WATCH catalyst text is owned by Python, not the model.
+    # Model WATCH fields are ignored when building the final result.
 
     # Guard the most common repetitive failure modes without trying to score prose aesthetics.
     if sections.get("OPENING") and sections.get("KEY LINE") and _token_overlap(sections["OPENING"], sections["KEY LINE"]) >= 0.78:
@@ -331,6 +392,27 @@ def _validate(sections, package):
     if sections.get("OPEN QUESTION") and sections.get("KEY LINE") and _token_overlap(sections["OPEN QUESTION"], sections["KEY LINE"]) >= 0.72:
         errors.append("OPEN QUESTION is too repetitive with KEY LINE")
     return errors
+
+
+def _approved_watch_items(package, limit=4):
+    """Return exact Python-approved watch items, deduplicated in order."""
+    output = []
+    seen = set()
+
+    for item in package.get("watch_items", []):
+        cleaned = _clean(item)
+        key = cleaned.lower()
+
+        if not cleaned or key in seen:
+            continue
+
+        seen.add(key)
+        output.append(cleaned)
+
+        if len(output) >= limit:
+            break
+
+    return output
 
 
 def _template(headline_count):
@@ -375,7 +457,7 @@ STYLE
 Write for a smart university student who wants to understand markets, not for a terminal screen. Prefer concrete nouns and verbs. No emojis, em dashes, en dashes, first person, forced three-part rhetorical lists, or stock AI phrases such as amid, underscores, notably, robust, the takeaway, it is worth noting, let us dive in, when it comes to, or a testament to.
 
 OUTPUT CONTRACT
-Return only the provided plain-text template. Keep every label exactly unchanged. Include BEGIN BRIEF and END BRIEF. Use only approved source names and copy approved watch items exactly. Do not add or remove headline slots."""
+Return only the provided plain-text template. Keep every label exactly unchanged. Include BEGIN BRIEF and END BRIEF. Use only approved source names. Python owns the final watch list, so write exactly 'none' in WATCH 1 through WATCH 4. Do not add or remove headline slots."""
 
 
 def _editor_system():
@@ -397,13 +479,13 @@ OPEN QUESTION TEST
 Treat this as a daily markets-interview learning prompt. It must be short, plain English, reusable beyond today's story, and answerable by reasoning. The three-sentence answer should directly answer, explain the mechanism, then say what one would watch. Avoid trivia, vague narrative questions, and unexplained jargon.
 
 GROUNDING
-Use only supplied market data, selected clusters, evidence, approved sources, and approved watch items. Do not add unsupported facts, numbers, dates, causes, implications, catalysts, or sources.
+Use only supplied market data, selected clusters, evidence, approved sources, and approved watch items. Do not add unsupported facts, numbers, dates, causes, implications, catalysts, or sources. Python owns the final watch list, so keep WATCH 1 through WATCH 4 as exactly 'none'.
 
 Return the full plain-text template only. Keep every label, cluster ID field, BEGIN BRIEF, and END BRIEF. Do not add or remove headline slots. PARALLAX and OPEN ANSWER must each contain exactly three sentences. OPENING and KEY LINE must each contain one sentence. WHAT'S MOVING may be exactly 'none'. No JSON, Markdown, emojis, em dashes, en dashes, or commentary outside the template."""
 
 
 def _repair_system():
-    return """You are repairing a Parallax draft that failed deterministic validation. Return the complete corrected plain-text template only. Preserve every supported claim that is already valid. Fix only the supplied validation errors plus obvious template breakage. Do not add facts, sources, dates, numbers, events, causes, implications, or watch items. Keep every label exactly unchanged, preserve every approved HEADLINE N CLUSTER value exactly once, and include BEGIN BRIEF and END BRIEF. PARALLAX and OPEN ANSWER must each contain exactly three sentences. No JSON, Markdown, emojis, em dashes, en dashes, or commentary."""
+    return """You are repairing a Parallax draft that failed deterministic validation. Return the complete corrected plain-text template only. Preserve every supported claim that is already valid. Fix only the supplied validation errors plus obvious template breakage. Do not add facts, sources, dates, numbers, events, causes, implications, or watch items. Python owns the final watch list, so keep WATCH 1 through WATCH 4 as exactly 'none'. Keep every label exactly unchanged, preserve every approved HEADLINE N CLUSTER value exactly once, and include BEGIN BRIEF and END BRIEF. PARALLAX and OPEN ANSWER must each contain exactly three sentences. No JSON, Markdown, emojis, em dashes, en dashes, or commentary."""
 
 
 def _build_user(reference_dt, market, package, draft=None, repair_errors=None):
@@ -444,11 +526,8 @@ def _parse_to_result(raw, package):
             "cluster_id": cluster_id,
         })
 
-    watch = []
-    for number in range(1, 5):
-        value = _clean(sections.get(f"WATCH {number}"))
-        if value and value.lower() != "none":
-            watch.append(value)
+    # Exact catalyst strings come directly from the deterministic ranked package.
+    watch = _approved_watch_items(package)
 
     moving = _clean(sections["WHAT'S MOVING"])
     if moving.lower() == "none":

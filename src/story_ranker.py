@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, asdict
 from difflib import SequenceMatcher
@@ -30,6 +31,9 @@ ALLOW_SPECIALIST_EXCEPTION = getattr(config, "ALLOW_SPECIALIST_EXCEPTION", True)
 STORY_EXTRACTION_BATCH_SIZE = getattr(config, "STORY_EXTRACTION_BATCH_SIZE", 5)
 ENABLE_AI_BORDERLINE_ADJUDICATION = getattr(config, "ENABLE_AI_BORDERLINE_ADJUDICATION", True)
 MAX_EXTRACTION_FALLBACK_SHARE = getattr(config, "MAX_EXTRACTION_FALLBACK_SHARE", 0.25)
+AI_MIN_CALL_INTERVAL_SECONDS = getattr(config, "AI_MIN_CALL_INTERVAL_SECONDS", 13.0)
+AI_MAX_RATE_LIMIT_RETRIES = getattr(config, "AI_MAX_RATE_LIMIT_RETRIES", 3)
+
 
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
@@ -130,7 +134,27 @@ def _client():
     return None if not key else OpenAI(api_key=key, base_url=config.AI_BASE_URL)
 
 
+def _daily_quota_exhausted(message: str) -> bool:
+    text = str(message or "")
+    lower = text.lower()
+    return (
+        "GenerateRequestsPerDayPerProjectPerModel-FreeTier" in text
+        or "requests_per_day" in lower
+        or "requests per day" in lower
+        or "perdayperprojectpermodel" in lower
+    )
+
+
 def _text_call(client, system: str, user: str, max_tokens=1200, temperature=0.05) -> str:
+    """Make one paced Gemini/OpenAI-compatible text request.
+
+    Ranking and synthesis share one process-wide pacing clock via config.
+    Temporary RPM limits receive bounded retries. A daily free-tier quota
+    exhaustion fails immediately and disables further AI calls for this run.
+    """
+    if getattr(config, "_AI_DAILY_QUOTA_EXHAUSTED", False):
+        raise RuntimeError("Gemini daily free-tier request quota exhausted.")
+
     kwargs = {
         "model": config.AI_MODEL,
         "messages": [
@@ -140,15 +164,83 @@ def _text_call(client, system: str, user: str, max_tokens=1200, temperature=0.05
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
+
     reasoning_effort = getattr(config, "AI_REASONING_EFFORT", "low")
     if reasoning_effort:
         kwargs["reasoning_effort"] = reasoning_effort
 
-    response = client.chat.completions.create(**kwargs)
+    response = None
+
+    for attempt in range(AI_MAX_RATE_LIMIT_RETRIES + 1):
+        last_call = getattr(config, "_AI_LAST_CALL_TIME", 0.0)
+        elapsed = (
+            time.monotonic() - last_call
+            if last_call
+            else AI_MIN_CALL_INTERVAL_SECONDS
+        )
+
+        if last_call and elapsed < AI_MIN_CALL_INTERVAL_SECONDS:
+            wait = AI_MIN_CALL_INTERVAL_SECONDS - elapsed
+            utils.log(f"[AI] Rate-limit pacing: waiting {wait:.1f}s.")
+            time.sleep(wait)
+
+        if getattr(config, "_AI_DAILY_QUOTA_EXHAUSTED", False):
+            raise RuntimeError("Gemini daily free-tier request quota exhausted.")
+
+        try:
+            config._AI_LAST_CALL_TIME = time.monotonic()
+            response = client.chat.completions.create(**kwargs)
+            break
+
+        except Exception as exc:
+            error_text = str(exc)
+
+            if _daily_quota_exhausted(error_text):
+                config._AI_DAILY_QUOTA_EXHAUSTED = True
+                raise RuntimeError(
+                    "Gemini daily free-tier request quota exhausted."
+                ) from exc
+
+            is_rate_limit = (
+                "429" in error_text
+                or "RESOURCE_EXHAUSTED" in error_text
+                or "rate limit" in error_text.lower()
+                or "quota exceeded" in error_text.lower()
+            )
+
+            if not is_rate_limit or attempt >= AI_MAX_RATE_LIMIT_RETRIES:
+                raise
+
+            retry_match = re.search(
+                r"retry in\s+([0-9.]+)s",
+                error_text,
+                flags=re.IGNORECASE,
+            )
+            if not retry_match:
+                retry_match = re.search(
+                    r"retryDelay['\"]?\s*:\s*['\"]([0-9.]+)s",
+                    error_text,
+                    flags=re.IGNORECASE,
+                )
+
+            server_wait = float(retry_match.group(1)) if retry_match else 15.0
+            wait = max(server_wait + 2.0, AI_MIN_CALL_INTERVAL_SECONDS)
+
+            utils.log(
+                "[AI] Gemini temporary rate limit reached; "
+                f"waiting {wait:.1f}s before retry "
+                f"{attempt + 1}/{AI_MAX_RATE_LIMIT_RETRIES}."
+            )
+            time.sleep(wait)
+
+    if response is None:
+        raise RuntimeError("AI request failed without returning a response.")
+
     choice = response.choices[0]
     text = (choice.message.content or "").strip()
     usage = getattr(response, "usage", None)
     finish_reason = getattr(choice, "finish_reason", None)
+
     utils.log(
         "[AI] "
         f"finish_reason={finish_reason} "
@@ -156,10 +248,14 @@ def _text_call(client, system: str, user: str, max_tokens=1200, temperature=0.05
         f"completion_tokens={getattr(usage, 'completion_tokens', None)} "
         f"chars={len(text)}"
     )
+
     if not text:
         raise RuntimeError("AI returned empty content")
     if str(finish_reason).lower() == "length":
-        raise RuntimeError("AI response truncated because output token limit was reached")
+        raise RuntimeError(
+            "AI response truncated because output token limit was reached"
+        )
+
     return text
 
 
@@ -291,7 +387,7 @@ HEADLINE, EVIDENCE, or END."""
             for x in batch
         )
         try:
-            response = _text_call(client, system, payload, max_tokens=2200)
+            response = _text_call(client, system, payload, max_tokens=max(2200, 550 * len(batch)))
             parsed = _parse_story_blocks(response, batch)
             represented = {story.story_id.split("_S", 1)[0] for story in parsed}
             missing = [item for item in batch if item["input_id"] not in represented]
