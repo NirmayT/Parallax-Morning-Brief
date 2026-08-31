@@ -1,4 +1,4 @@
--- Parallax subscriber database v1
+-- Parallax subscriber database schema
 -- Run in Supabase SQL Editor.
 
 create table if not exists public.subscribers (
@@ -11,7 +11,8 @@ create table if not exists public.subscribers (
     unsubscribed_at timestamptz,
     confirmation_token uuid not null default gen_random_uuid(),
     unsubscribe_token uuid not null default gen_random_uuid(),
-    source text not null default 'website'
+    source text not null default 'website',
+    consent_version text not null default 'v1'
 );
 
 create index if not exists subscribers_status_idx
@@ -26,8 +27,8 @@ create unique index if not exists subscribers_unsubscribe_token_idx
 alter table public.subscribers enable row level security;
 
 -- No browser/client policies are intentionally created.
--- Website API routes and the Python pipeline should use separate Supabase
--- secret keys on trusted server-side environments only.
+-- Website API routes and the Python pipeline must access this table only
+-- from trusted server-side environments using secret/service-role credentials.
 
 revoke all on table public.subscribers from anon, authenticated;
 grant all on table public.subscribers to service_role;
