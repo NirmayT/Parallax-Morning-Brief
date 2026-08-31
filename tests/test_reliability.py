@@ -64,6 +64,8 @@ class ReliabilityTests(unittest.TestCase):
             synthesis._call(_FakeClient(response), "system", "user", max_tokens=100)
 
     def test_synthesis_call_retries_rpm_limit_once(self):
+        config._AI_LAST_CALL_TIME = 0.0
+        config._AI_DAILY_QUOTA_EXHAUSTED = False
         response = SimpleNamespace(
             choices=[SimpleNamespace(
                 finish_reason="stop",
