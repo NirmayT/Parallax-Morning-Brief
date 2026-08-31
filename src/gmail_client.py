@@ -1,4 +1,4 @@
-"""Read labeled Gmail messages using one token with read and send scopes."""
+"""Read labeled Gmail messages from the configured Gmail label."""
 import os
 import config
 import utils

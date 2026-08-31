@@ -111,7 +111,6 @@ PUBLIC_SITE_URL = os.getenv(
 BROADCAST_MAX_RECIPIENTS = int(os.getenv("BROADCAST_MAX_RECIPIENTS", "90"))
 
 # Newsletter identification / compliance metadata.
-# Note: a mailing address is intentionally not enforced in this temporary version.
 PUBLISHER_NAME = os.getenv(
     "PUBLISHER_NAME",
     "Parallax Research Group",
@@ -137,11 +136,7 @@ DEBUG_DIR = "debug"
 LOG_FILE = "outputs/run_log.txt"
 STORY_MEMORY_DAYS = 4
 
-GMAIL_SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-]
-GMAIL_SEND_SCOPES = GMAIL_SCOPES
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 CREDENTIALS_FILE = "credentials.json"
 TOKEN_FILE = "token.json"
 
