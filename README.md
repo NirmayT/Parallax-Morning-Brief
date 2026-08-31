@@ -262,7 +262,7 @@ Market data may be delayed and is not intended to replace institutional market-d
 
 ## AI's Role
 
-Gemini is used for writing and editing — not for controlling the entire pipeline.
+Gemini is used for bounded story extraction, writing, and editing — not for controlling the entire pipeline.
 
 ```text
 Selected stories
@@ -279,7 +279,7 @@ Market data
 Python checks
 ```
 
-The first AI call writes the complete edition from the selected material. The second reviews the edition as a whole. Python then decides whether the result satisfies the publication requirements.
+After story extraction and deterministic ranking, one AI call writes the complete edition from the selected material and another reviews the edition as a whole. A bounded repair call may be used when the first draft fails deterministic validation. Python then decides whether the result satisfies the publication requirements.
 
 If the ranking stage cannot find enough distinct material, the writing stage is skipped entirely.
 
@@ -611,9 +611,9 @@ py src/main.py --dry-run --force
 
 A dry run can retrieve market data, read new newsletters, rank stories, generate an edition when sufficient material exists, validate it, and save the resulting HTML locally.
 
-It does not broadcast the newsletter or advance successful-run state.
+When the edition passes the publication gate, the dry run also saves the exact sendable candidate for up to two hours. It does not broadcast the newsletter or advance successful-run state.
 
-If there is not enough material, the program exits before the AI writing stage.
+Starting a new dry run invalidates any older candidate. If there is not enough material, the program exits before the AI writing stage and no sendable candidate is created.
 
 ### Live Run
 
@@ -621,25 +621,21 @@ If there is not enough material, the program exits before the AI writing stage.
 py src/main.py --force
 ```
 
-For a publishable edition:
+A live run first looks for a recent, publish-ready dry-run candidate. When one exists, Parallax sends that exact reviewed subject, plain text, and HTML instead of re-reading Gmail or regenerating the edition.
 
 ```text
-Generate
-   ↓
-Validate
-   ↓
-Save HTML
-   ↓
+Reviewed dry-run candidate
+          ↓
 Load active subscribers
-   ↓
-Add unsubscribe links
-   ↓
+          ↓
+Add individual unsubscribe links
+          ↓
 Send through Resend
-   ↓
+          ↓
 Update successful-run state
 ```
 
-If the edition fails validation, live delivery is blocked.
+If no valid candidate exists, the live run can generate and validate a fresh edition through the normal pipeline. If the edition fails validation, live delivery is blocked.
 
 ---
 
@@ -655,8 +651,8 @@ The recommended sequence is:
 5. Inspect the generated newsletter
 6. Inspect the ranking audit
 7. Confirm the edition passed
-8. Test delivery in a controlled inbox
-9. Run production delivery
+8. Run production delivery within the candidate window
+9. Confirm delivery acceptance and state update
 ```
 
 Useful commands:
